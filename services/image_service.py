@@ -59,6 +59,16 @@ class GeneratedImage:
     url: str = ""
 
 
+@dataclass
+class EditInputImage:
+    file_id: str
+    data: bytes
+    file_name: str
+    mime_type: str
+    width: int
+    height: int
+
+
 def _build_fp(access_token: str) -> dict:
     account = account_service.get_account(access_token) or {}
     fp = {}
@@ -287,12 +297,7 @@ def _send_edit_conversation(
     parent_message_id: str,
     prompt: str,
     model: str,
-    file_id: str,
-    image_size: int,
-    image_width: int,
-    image_height: int,
-    file_name: str,
-    mime_type: str,
+    images: list[EditInputImage],
 ):
     headers = {
         "Authorization": f"Bearer {access_token}",
@@ -309,6 +314,29 @@ def _send_edit_conversation(
     }
     if proof_token:
         headers["openai-sentinel-proof-token"] = proof_token
+    image_parts = [
+        {
+            "content_type": "image_asset_pointer",
+            "asset_pointer": f"sediment://{image.file_id}",
+            "size_bytes": len(image.data),
+            "width": image.width,
+            "height": image.height,
+        }
+        for image in images
+    ]
+    attachments = [
+        {
+            "id": image.file_id,
+            "size": len(image.data),
+            "name": image.file_name,
+            "mime_type": image.mime_type,
+            "width": image.width,
+            "height": image.height,
+            "source": "local",
+            "is_big_paste": False,
+        }
+        for image in images
+    ]
     response = _retry(
         lambda: session.post(
             BASE_URL + "/backend-api/conversation",
@@ -321,30 +349,10 @@ def _send_edit_conversation(
                         "author": {"role": "user"},
                         "content": {
                             "content_type": "multimodal_text",
-                            "parts": [
-                                {
-                                    "content_type": "image_asset_pointer",
-                                    "asset_pointer": f"sediment://{file_id}",
-                                    "size_bytes": image_size,
-                                    "width": image_width,
-                                    "height": image_height,
-                                },
-                                prompt,
-                            ],
+                            "parts": [*image_parts, prompt],
                         },
                         "metadata": {
-                            "attachments": [
-                                {
-                                    "id": file_id,
-                                    "size": image_size,
-                                    "name": file_name,
-                                    "mime_type": mime_type,
-                                    "width": image_width,
-                                    "height": image_height,
-                                    "source": "local",
-                                    "is_big_paste": False,
-                                }
-                            ],
+                            "attachments": attachments,
                         },
                     }
                 ],
@@ -577,6 +585,16 @@ def _poll_image_ids(session: Session, access_token: str, device_id: str, convers
     return []
 
 
+def _canonicalize_file_id(file_id: str) -> str:
+    value = str(file_id or "")
+    return value[4:] if value.startswith("sed:") else value
+
+
+def _filter_output_file_ids(file_ids: list[str], input_file_ids: set[str]) -> list[str]:
+    canonical_input_ids = {_canonicalize_file_id(file_id) for file_id in input_file_ids}
+    return [file_id for file_id in file_ids if _canonicalize_file_id(file_id) not in canonical_input_ids]
+
+
 def _fetch_download_url(session: Session, access_token: str, device_id: str, conversation_id: str, file_id: str) -> str:
     is_sediment = file_id.startswith("sed:")
     raw_id = file_id[4:] if is_sediment else file_id
@@ -721,9 +739,7 @@ def _get_image_dimensions(image_data: bytes) -> tuple[int, int]:
 def edit_image_result(
     access_token: str,
     prompt: str,
-    image_data: bytes,
-    file_name: str = "image.png",
-    mime_type: str = "image/png",
+    images: list[tuple[bytes, str, str]],
     model: str = DEFAULT_MODEL,
 ) -> dict:
     prompt = str(prompt or "").strip()
@@ -732,7 +748,7 @@ def edit_image_result(
         raise ImageGenerationError("prompt is required")
     if not access_token:
         raise ImageGenerationError("token is required")
-    if not image_data:
+    if not images:
         raise ImageGenerationError("image is required")
 
     session, fp = _new_session(access_token)
@@ -740,14 +756,28 @@ def edit_image_result(
         upstream_model = _resolve_upstream_model(access_token, model)
         print(
             f"[image-edit-upstream] start token={access_token[:12]}... "
-            f"requested_model={model} upstream_model={upstream_model}"
+            f"requested_model={model} upstream_model={upstream_model} images={len(images)}"
         )
         device_id = _bootstrap(session, fp)
 
-        file_id = _upload_image(session, access_token, device_id, image_data, file_name, mime_type)
-        print(f"[image-edit-upstream] uploaded file_id={file_id}")
+        uploaded_images: list[EditInputImage] = []
+        for image_data, file_name, mime_type in images:
+            if not image_data:
+                raise ImageGenerationError("image is required")
 
-        image_width, image_height = _get_image_dimensions(image_data)
+            file_id = _upload_image(session, access_token, device_id, image_data, file_name, mime_type)
+            print(f"[image-edit-upstream] uploaded file_id={file_id}")
+            image_width, image_height = _get_image_dimensions(image_data)
+            uploaded_images.append(
+                EditInputImage(
+                    file_id=file_id,
+                    data=image_data,
+                    file_name=file_name,
+                    mime_type=mime_type,
+                    width=image_width,
+                    height=image_height,
+                )
+            )
 
         chat_token, pow_info = _chat_requirements(session, access_token, device_id)
         proof_token = None
@@ -768,19 +798,18 @@ def edit_image_result(
             parent_message_id,
             prompt,
             upstream_model,
-            file_id,
-            len(image_data),
-            image_width,
-            image_height,
-            file_name,
-            mime_type,
+            uploaded_images,
         )
         parsed = _parse_sse(response)
         actual_conversation_id = parsed.get("conversation_id") or ""
-        file_ids = parsed.get("file_ids") or []
+        input_file_ids = {image.file_id for image in uploaded_images}
+        file_ids = _filter_output_file_ids(parsed.get("file_ids") or [], input_file_ids)
         response_text = str(parsed.get("text") or "").strip()
         if actual_conversation_id and not file_ids:
-            file_ids = _poll_image_ids(session, access_token, device_id, actual_conversation_id)
+            file_ids = _filter_output_file_ids(
+                _poll_image_ids(session, access_token, device_id, actual_conversation_id),
+                input_file_ids,
+            )
         if not file_ids:
             if response_text:
                 raise ImageGenerationError(response_text)
@@ -794,7 +823,7 @@ def edit_image_result(
             revised_prompt=prompt,
             url=download_url,
         )
-        print(f"[image-edit-upstream] success token={access_token[:12]}... images=1")
+        print(f"[image-edit-upstream] success token={access_token[:12]}... inputs={len(uploaded_images)}")
         return {
             "created": time.time_ns() // 1_000_000_000,
             "data": [{"b64_json": result.b64_json, "revised_prompt": result.revised_prompt}],

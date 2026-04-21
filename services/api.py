@@ -283,6 +283,7 @@ def create_app() -> FastAPI:
     async def edit_images(
             authorization: str | None = Header(default=None),
             image: UploadFile | None = File(default=None),
+            image_list: list[UploadFile] | None = File(default=None, alias="image[]"),
             prompt: str = Form(...),
             model: str = Form(default="gpt-image-1"),
             n: int = Form(default=1),
@@ -291,19 +292,28 @@ def create_app() -> FastAPI:
         if n < 1 or n > 4:
             raise HTTPException(status_code=400, detail={"error": "n must be between 1 and 4"})
 
-        if image is None:
+        uploads: list[UploadFile] = []
+        if image is not None:
+            uploads.append(image)
+        if image_list:
+            uploads.extend(upload for upload in image_list if upload is not None)
+
+        if not uploads:
             raise HTTPException(status_code=400, detail={"error": "image file is required"})
 
-        image_data = await image.read()
-        if not image_data:
-            raise HTTPException(status_code=400, detail={"error": "image file is empty"})
+        images: list[tuple[bytes, str, str]] = []
+        for upload in uploads:
+            image_data = await upload.read()
+            if not image_data:
+                raise HTTPException(status_code=400, detail={"error": "image file is empty"})
 
-        file_name = image.filename or "image.png"
-        mime_type = image.content_type or "image/png"
+            file_name = upload.filename or "image.png"
+            mime_type = upload.content_type or "image/png"
+            images.append((image_data, file_name, mime_type))
 
         try:
             return await run_in_threadpool(
-                chatgpt_service.edit_with_pool, prompt, image_data, file_name, mime_type, model, n
+                chatgpt_service.edit_with_pool, prompt, images, model, n
             )
         except ImageGenerationError as exc:
             raise HTTPException(status_code=502, detail={"error": str(exc)}) from exc

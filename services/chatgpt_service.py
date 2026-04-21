@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from typing import Iterable
+
 from fastapi import HTTPException
 
 from services.account_service import AccountService
@@ -89,9 +91,18 @@ class ChatGPTService:
             "data": image_items,
         }
 
-    def edit_with_pool(self, prompt: str, image_data: bytes, file_name: str, mime_type: str, model: str, n: int):
+    def edit_with_pool(
+        self,
+        prompt: str,
+        images: Iterable[tuple[bytes, str, str]],
+        model: str,
+        n: int,
+    ):
         created = None
         image_items: list[dict[str, object]] = []
+        normalized_images = list(images)
+        if not normalized_images:
+            raise ImageGenerationError("image is required")
 
         for index in range(1, n + 1):
             while True:
@@ -101,9 +112,12 @@ class ChatGPTService:
                     print(f"[image-edit] stop index={index}/{n} error={exc}")
                     break
 
-                print(f"[image-edit] start pooled token={request_token[:12]}... model={model} index={index}/{n}")
+                print(
+                    f"[image-edit] start pooled token={request_token[:12]}... "
+                    f"model={model} index={index}/{n} images={len(normalized_images)}"
+                )
                 try:
-                    result = edit_image_result(request_token, prompt, image_data, file_name, mime_type, model)
+                    result = edit_image_result(request_token, prompt, normalized_images, model)
                     account = self.account_service.mark_image_result(request_token, success=True)
                     if created is None:
                         created = result.get("created")
@@ -156,7 +170,7 @@ class ChatGPTService:
         try:
             if image_info:
                 image_data, mime_type = image_info
-                image_result = self.edit_with_pool(prompt, image_data, "image.png", mime_type, model, n)
+                image_result = self.edit_with_pool(prompt, [(image_data, "image.png", mime_type)], model, n)
             else:
                 image_result = self.generate_with_pool(prompt, model, n)
         except ImageGenerationError as exc:
@@ -183,7 +197,7 @@ class ChatGPTService:
         try:
             if image_info:
                 image_data, mime_type = image_info
-                image_result = self.edit_with_pool(prompt, image_data, "image.png", mime_type, "gpt-image-1", 1)
+                image_result = self.edit_with_pool(prompt, [(image_data, "image.png", mime_type)], "gpt-image-1", 1)
             else:
                 image_result = self.generate_with_pool(prompt, "gpt-image-1", 1)
         except ImageGenerationError as exc:
