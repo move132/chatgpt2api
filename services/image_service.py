@@ -624,7 +624,7 @@ def _download_as_base64(session: Session, download_url: str) -> str:
     return base64.b64encode(response.content).decode("ascii")
 
 
-def _download_and_save_image(session: Session, download_url: str) -> str:
+def _download_and_save_image(session: Session, download_url: str, base_url: str = None) -> str:
     """下载图片并保存到本地，返回本地 URL"""
     response = session.get(download_url, timeout=60)
     if not response.ok or not response.content:
@@ -639,8 +639,9 @@ def _download_and_save_image(session: Session, download_url: str) -> str:
     file_path = config.images_dir / filename
     file_path.write_bytes(response.content)
     
-    # 返回本地 URL
-    return f"{config.base_url}/images/{filename}"
+    # 使用传入的 base_url 或配置的 base_url
+    actual_base_url = base_url or config.base_url
+    return f"{actual_base_url}/images/{filename}"
 
 
 def _resolve_upstream_model(access_token: str, requested_model: str) -> str:
@@ -655,7 +656,7 @@ def _resolve_upstream_model(access_token: str, requested_model: str) -> str:
     return str(requested_model or DEFAULT_MODEL).strip() or DEFAULT_MODEL
 
 
-def generate_image_result(access_token: str, prompt: str, model: str = DEFAULT_MODEL, response_format: str = "b64_json") -> dict:
+def generate_image_result(access_token: str, prompt: str, model: str = DEFAULT_MODEL, response_format: str = "b64_json", base_url: str = None) -> dict:
     prompt = str(prompt or "").strip()
     access_token = str(access_token or "").strip()
     if not prompt:
@@ -708,7 +709,7 @@ def generate_image_result(access_token: str, prompt: str, model: str = DEFAULT_M
         
         # 根据 response_format 返回不同格式
         if response_format == "url":
-            result_data = {"url": _download_and_save_image(session, download_url), "revised_prompt": prompt}
+            result_data = {"url": _download_and_save_image(session, download_url, base_url), "revised_prompt": prompt}
         else:
             result_data = {"b64_json": _download_as_base64(session, download_url), "revised_prompt": prompt}
         
@@ -765,6 +766,7 @@ def edit_image_result(
     images: list[tuple[bytes, str, str]],
     model: str = DEFAULT_MODEL,
     response_format: str = "b64_json",
+    base_url: str = None,
 ) -> dict:
     prompt = str(prompt or "").strip()
     access_token = str(access_token or "").strip()
@@ -845,7 +847,7 @@ def edit_image_result(
         
         # 根据 response_format 返回不同格式
         if response_format == "url":
-            result_data = {"url": _download_and_save_image(session, download_url), "revised_prompt": prompt}
+            result_data = {"url": _download_and_save_image(session, download_url, base_url), "revised_prompt": prompt}
         else:
             result_data = {"b64_json": _download_as_base64(session, download_url), "revised_prompt": prompt}
         

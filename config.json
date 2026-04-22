@@ -1,5 +1,4 @@
 {
   "auth-key": "chatgpt2api",
-  "refresh_account_interval_minute": 60,
-  "base_url": "http://localhost:8000"
+  "refresh_account_interval_minute": 60
 }

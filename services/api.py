@@ -4,7 +4,7 @@ from contextlib import asynccontextmanager
 from pathlib import Path
 from threading import Event, Thread
 
-from fastapi import APIRouter, FastAPI, File, Form, Header, HTTPException, UploadFile
+from fastapi import APIRouter, FastAPI, File, Form, Header, HTTPException, Request, UploadFile
 from fastapi.concurrency import run_in_threadpool
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse
@@ -273,17 +273,24 @@ def create_app() -> FastAPI:
         return {"item": account, "items": account_service.list_accounts()}
 
     @router.post("/v1/images/generations")
-    async def generate_images(body: ImageGenerationRequest, authorization: str | None = Header(default=None)):
+    async def generate_images(
+        body: ImageGenerationRequest, 
+        request: Request,
+        authorization: str | None = Header(default=None)
+    ):
         require_auth_key(authorization)
+        # 获取真实的请求 URL
+        base_url = f"{request.url.scheme}://{request.headers.get('host', request.url.netloc)}"
         try:
             return await run_in_threadpool(
-                chatgpt_service.generate_with_pool, body.prompt, body.model, body.n, body.response_format
+                chatgpt_service.generate_with_pool, body.prompt, body.model, body.n, body.response_format, base_url
             )
         except ImageGenerationError as exc:
             raise HTTPException(status_code=502, detail={"error": str(exc)}) from exc
 
     @router.post("/v1/images/edits")
     async def edit_images(
+            request: Request,
             authorization: str | None = Header(default=None),
             image: list[UploadFile] = File(...),
             prompt: str = Form(...),
@@ -294,6 +301,9 @@ def create_app() -> FastAPI:
         require_auth_key(authorization)
         if n < 1 or n > 4:
             raise HTTPException(status_code=400, detail={"error": "n must be between 1 and 4"})
+
+        # 获取真实的请求 URL
+        base_url = f"{request.url.scheme}://{request.headers.get('host', request.url.netloc)}"
 
         images: list[tuple[bytes, str, str]] = []
         for upload in image:
@@ -307,7 +317,7 @@ def create_app() -> FastAPI:
 
         try:
             return await run_in_threadpool(
-                chatgpt_service.edit_with_pool, prompt, images, model, n, response_format
+                chatgpt_service.edit_with_pool, prompt, images, model, n, response_format, base_url
             )
         except ImageGenerationError as exc:
             raise HTTPException(status_code=502, detail={"error": str(exc)}) from exc
