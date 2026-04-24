@@ -965,11 +965,11 @@ class ChatGPTService:
         if not prompt:
             raise HTTPException(status_code=400, detail={"error": "prompt is required"})
 
-        image_info = extract_chat_image(body)
+        image_infos = extract_chat_image(body)
         try:
-            if image_info:
-                image_data, mime_type = image_info
-                image_result = self.edit_with_pool(prompt, [(image_data, "image.png", mime_type)], model, n)
+            if image_infos:
+                images = [(data, f"image_{idx}.png", mime) for idx, (data, mime) in enumerate(image_infos, start=1)]
+                image_result = self.edit_with_pool(prompt, images, model, n)
             else:
                 image_result = self.generate_with_pool(prompt, model, n)
         except ImageGenerationError as exc:
@@ -989,11 +989,11 @@ class ChatGPTService:
         if not prompt:
             raise HTTPException(status_code=400, detail={"error": "prompt is required"})
 
-        image_info = extract_chat_image(body)
+        image_infos = extract_chat_image(body)
         encoded_images = []
-        if image_info:
-            image_data, mime_type = image_info
-            encoded_images = self._encode_images([(image_data, "image.png", mime_type)])
+        if image_infos:
+            images = [(data, f"image_{idx}.png", mime) for idx, (data, mime) in enumerate(image_infos, start=1)]
+            encoded_images = self._encode_images(images)
 
         last_error = ""
         while True:

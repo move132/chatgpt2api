@@ -155,9 +155,10 @@ def extract_prompt_from_message_content(content: object) -> str:
     return "\n".join(parts).strip()
 
 
-def extract_image_from_message_content(content: object) -> tuple[bytes, str] | None:
+def extract_image_from_message_content(content: object) -> list[tuple[bytes, str]]:
     if not isinstance(content, list):
-        return None
+        return []
+    images = []
     for item in content:
         if not isinstance(item, dict):
             continue
@@ -168,29 +169,30 @@ def extract_image_from_message_content(content: object) -> tuple[bytes, str] | N
             if url.startswith("data:"):
                 header, _, data = url.partition(",")
                 mime = header.split(";")[0].removeprefix("data:")
-                return base64.b64decode(data), mime or "image/png"
-        if item_type == "input_image":
+                images.append((base64.b64decode(data), mime or "image/png"))
+        elif item_type == "input_image":
             image_url = str(item.get("image_url") or "")
             if image_url.startswith("data:"):
                 header, _, data = image_url.partition(",")
                 mime = header.split(";")[0].removeprefix("data:")
-                return base64.b64decode(data), mime or "image/png"
-    return None
+                images.append((base64.b64decode(data), mime or "image/png"))
+    return images
 
 
-def extract_chat_image(body: dict[str, object]) -> tuple[bytes, str] | None:
+def extract_chat_image(body: dict[str, object]) -> list[tuple[bytes, str]]:
     messages = body.get("messages")
     if not isinstance(messages, list):
-        return None
+        return []
+    all_images = []
     for message in reversed(messages):
         if not isinstance(message, dict):
             continue
         if str(message.get("role") or "").strip().lower() != "user":
             continue
-        result = extract_image_from_message_content(message.get("content"))
-        if result:
-            return result
-    return None
+        images = extract_image_from_message_content(message.get("content"))
+        if images:
+            all_images.extend(images)
+    return all_images
 
 
 def extract_chat_prompt(body: dict[str, object]) -> str:
