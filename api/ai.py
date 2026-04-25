@@ -8,7 +8,7 @@ from pydantic import BaseModel, ConfigDict, Field
 from api.support import raise_image_quota_error, require_identity, resolve_image_base_url
 from services.account_service import account_service
 from services.chatgpt_service import ChatGPTService, ImageGenerationError
-from utils.helper import is_image_chat_request, sse_json_stream
+from utils.helper import anthropic_sse_stream, is_image_chat_request, sse_json_stream
 
 
 class ImageGenerationRequest(BaseModel):
@@ -37,6 +37,14 @@ class ResponseCreateRequest(BaseModel):
     input: object | None = None
     tools: list[dict[str, object]] | None = None
     tool_choice: object | None = None
+    stream: bool | None = None
+
+
+class AnthropicMessageRequest(BaseModel):
+    model_config = ConfigDict(extra="allow")
+    model: str | None = None
+    messages: list[dict[str, object]] | None = None
+    system: object | None = None
     stream: bool | None = None
 
 
@@ -145,5 +153,21 @@ def create_router(chatgpt_service: ChatGPTService) -> APIRouter:
                 media_type="text/event-stream",
             )
         return await run_in_threadpool(chatgpt_service.create_response, payload)
+
+    @router.post("/v1/messages")
+    async def create_message(
+            body: AnthropicMessageRequest,
+            authorization: str | None = Header(default=None),
+            x_api_key: str | None = Header(default=None, alias="x-api-key"),
+            anthropic_version: str | None = Header(default=None, alias="anthropic-version"),
+    ):
+        require_identity(authorization or (f"Bearer {x_api_key}" if x_api_key else None))
+        payload = body.model_dump(mode="python")
+        if bool(payload.get("stream")):
+            return StreamingResponse(
+                anthropic_sse_stream(chatgpt_service.stream_message(payload)),
+                media_type="text/event-stream",
+            )
+        return await run_in_threadpool(chatgpt_service.create_message, payload)
 
     return router

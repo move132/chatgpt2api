@@ -73,6 +73,23 @@ def sse_json_stream(items) -> Iterator[str]:
     yield "data: [DONE]\n\n"
 
 
+def anthropic_sse_stream(items) -> Iterator[str]:
+    try:
+        for item in items:
+            event = str(item.get("type") or "message_delta") if isinstance(item, dict) else "message_delta"
+            yield f"event: {event}\n"
+            yield f"data: {json.dumps(item, ensure_ascii=False)}\n\n"
+    except Exception as exc:
+        logger.warning({
+            "event": "anthropic_sse_stream_error",
+            "error_type": exc.__class__.__name__,
+            "error": str(exc),
+        })
+        error = {"type": "error", "error": {"type": exc.__class__.__name__, "message": str(exc)}}
+        yield "event: error\n"
+        yield f"data: {json.dumps(error, ensure_ascii=False)}\n\n"
+
+
 def save_images_from_text(text: str, prefix: str) -> list[Path]:
     OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
     matches = re.findall(r"data:image/[^;]+;base64,[A-Za-z0-9+/=]+", text or "")

@@ -1070,6 +1070,32 @@ class ChatGPTService:
         except Exception as exc:
             raise HTTPException(status_code=502, detail={"error": str(exc)}) from exc
 
+    def create_message(self, body: dict[str, object]) -> dict[str, object]:
+        model = str(body.get("model") or "auto").strip() or "auto"
+        messages = self._chat_messages_from_body(body)
+        try:
+            return self._new_backend(self._get_text_access_token()).messages(
+                messages=messages,
+                model=model,
+                stream=False,
+                system=body.get("system"),
+            )
+        except Exception as exc:
+            raise HTTPException(status_code=502, detail={"error": str(exc)}) from exc
+
+    def stream_message(self, body: dict[str, object]) -> Iterator[dict[str, object]]:
+        model = str(body.get("model") or "auto").strip() or "auto"
+        messages = self._chat_messages_from_body(body)
+        try:
+            yield from self._new_backend(self._get_text_access_token()).messages(
+                messages=messages,
+                model=model,
+                stream=True,
+                system=body.get("system"),
+            )
+        except Exception as exc:
+            raise HTTPException(status_code=502, detail={"error": str(exc)}) from exc
+
     def create_image_completion(self, body: dict[str, object]) -> dict[str, object]:
         if not is_image_chat_request(body):
             raise HTTPException(
