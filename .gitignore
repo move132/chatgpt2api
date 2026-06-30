@@ -10,7 +10,7 @@ web_dist
 .venv
 .idea
 data
-config.json
+./config.json
 edit
 
 docker-compose-local.yml
@@ -33,3 +33,5 @@ git_cache/
 loginwithpassword_*/
 logwithemailverifycode_*/
 test_batch_output/
+
+config.local.json

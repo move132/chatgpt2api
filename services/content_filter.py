@@ -149,12 +149,13 @@ def _resolve_fail_open(review: dict) -> bool:
 
 def check_request(text: str) -> None:
     text = str(text or "")
-    if not text.strip():
+    normalized_text = text.strip()
+    if not normalized_text:
         return
-    # Local sensitive-word match runs on the raw text (cheap, no network).
+    # Local sensitive-word match runs before any network review.
     for word in config.sensitive_words:
-        if word in text:
-            raise HTTPException(status_code=400, detail={"error": "检测到敏感词，拒绝本次任务"})
+        if word == normalized_text:
+            raise HTTPException(status_code=400, detail={"error": "请提供具有实际意义的指令，拒绝本次任务。"})
     review = config.ai_review
     if not review.get("enabled"):
         return

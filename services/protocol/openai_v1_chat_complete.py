@@ -36,6 +36,7 @@ from utils.image_tokens import (
     count_image_output_items_tokens,
     image_usage,
 )
+from utils.tg_image_sender import iter_image_outputs_with_tg
 
 TOOL_UNAVAILABLE_SYSTEM_MESSAGE = (
     "This compatibility backend cannot execute local tools, shell commands, non-search tools, "
@@ -265,7 +266,7 @@ def stream_image_chat_completion(image_outputs: Iterable[ImageOutput], model: st
     created = int(time.time())
     sent_role = False
     sent_text = ""
-    for output in image_outputs:
+    for output in iter_image_outputs_with_tg(image_outputs):
         content = ""
         if output.kind == "progress":
             content = output.text

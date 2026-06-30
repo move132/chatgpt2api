@@ -35,6 +35,7 @@ from utils.image_tokens import (
     image_usage,
     token_usage,
 )
+from utils.tg_image_sender import iter_image_outputs_with_tg
 
 TOOL_UNAVAILABLE_SYSTEM_MESSAGE = (
     "This compatibility backend cannot execute local tools, shell commands, non-search tools, "
@@ -370,7 +371,7 @@ def stream_image_response(
     response_id = f"resp_{uuid.uuid4().hex}"
     created = int(time.time())
     yield response_created(response_id, model, created)
-    for output in image_outputs:
+    for output in iter_image_outputs_with_tg(image_outputs):
         if output.kind == "message":
             text = output.text
             item = text_output_item(text)

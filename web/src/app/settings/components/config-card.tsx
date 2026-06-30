@@ -268,10 +268,10 @@ export function ConfigCard() {
             <Textarea
               value={(config?.sensitive_words || []).join("\n")}
               onChange={(event) => setSensitiveWordsText(event.target.value)}
-              placeholder="一行一个，命中即拒绝"
+              placeholder="一行一个，完全匹配即拒绝"
               className="min-h-28 rounded-xl border-stone-200 bg-white font-mono text-xs shadow-none"
             />
-            <p className="text-xs text-stone-500">只要用户请求包含任意敏感词，就直接返回拒绝。</p>
+            <p className="text-xs text-stone-500">用户请求去除首尾空白后等于任意敏感词时，直接返回拒绝。</p>
           </div>
           <div className="space-y-4 rounded-xl border border-stone-200 bg-white px-4 py-3 md:col-span-2">
             <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">

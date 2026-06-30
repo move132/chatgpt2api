@@ -915,7 +915,7 @@ class MoEmailProvider(BaseMailProvider):
             self.domain = [str(item).strip() for item in raw_domains if str(item).strip()]
         else:
             self.domain = [str(raw_domains).strip()] if str(raw_domains).strip() else []
-        self.expiry_time = int(entry.get("expiry_time") or 0)
+        self.expiry_time = int(entry.get("expiryTime", entry.get("expiry_time") or 0) or 0)
         self.session = _create_session(conf)
 
     def _request(self, method: str, path: str, params: dict | None = None, payload: dict | None = None, expected: tuple[int, ...] = (200,)):

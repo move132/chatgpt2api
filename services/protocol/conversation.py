@@ -23,6 +23,7 @@ from utils.helper import (
 )
 from utils.image_tokens import count_image_content_tokens
 from utils.log import logger
+from utils.tg_image_sender import _try_send_images_to_tg, iter_image_outputs_with_tg
 
 
 class ImageGenerationError(Exception):
@@ -1541,8 +1542,8 @@ def stream_image_outputs_with_pool(request: ConversationRequest) -> Iterator[Ima
         raise ImageGenerationError(image_stream_error_message(last_error), conversation_id="")
 
 
-def stream_image_chunks(outputs: Iterable[ImageOutput]) -> Iterator[dict[str, Any]]:
-    for output in outputs:
+def stream_image_chunks(outputs: Iterable[ImageOutput], send_to_tg: bool = True) -> Iterator[dict[str, Any]]:
+    for output in iter_image_outputs_with_tg(outputs, send_to_tg=send_to_tg):
         yield output.to_chunk()
 
 
@@ -1550,6 +1551,7 @@ def collect_image_outputs(outputs: Iterable[ImageOutput]) -> dict[str, Any]:
     created = None
     data: list[dict[str, Any]] = []
     message = ""
+    prompt = ""
     progress_parts: list[str] = []
     account_email = ""
     for output in outputs:
@@ -1562,6 +1564,10 @@ def collect_image_outputs(outputs: Iterable[ImageOutput]) -> dict[str, Any]:
             message = output.text
         elif output.kind == "result":
             data.extend(output.data)
+            for item in output.data:
+                revised_prompt = str(item.get("revised_prompt") or "")
+                if revised_prompt and not prompt:
+                    prompt = revised_prompt
 
     result: dict[str, Any] = {"created": created or int(time.time()), "data": data}
     if not data:
@@ -1570,4 +1576,5 @@ def collect_image_outputs(outputs: Iterable[ImageOutput]) -> dict[str, Any]:
             result["message"] = text
     if account_email:
         result["_account_email"] = account_email
+    _try_send_images_to_tg(data, prompt or message)
     return result

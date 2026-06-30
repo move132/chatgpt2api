@@ -52,7 +52,7 @@ export function RegisterCard() {
       ...(type === "cloudmail_gen" ? { api_base: "", admin_email: "", admin_password: "", domain: [], subdomain: [], email_prefix: "" } : {}),
       ...(type === "cloudflare_temp_email" ? { api_base: "", admin_password: "", domain: [] } : {}),
       ...(type === "tempmail_lol" ? { api_key: "", domain: [] } : {}),
-      ...(type === "moemail" ? { api_base: "", api_key: "", domain: [] } : {}),
+      ...(type === "moemail" ? { api_base: "", api_key: "", domain: [], expiry_time: 0 } : {}),
       ...(type === "inbucket" ? { api_base: "", domain: [], random_subdomain: true } : {}),
       ...(type === "duckmail" ? { api_key: "", default_domain: "duckmail.sbs" } : {}),
       ...(type === "gptmail" ? { api_key: "", default_domain: "" } : {}),
@@ -261,6 +261,22 @@ export function RegisterCard() {
                         <div className="space-y-2">
                           <label className="text-sm text-stone-700">Default Domain</label>
                           <Input value={String(provider.default_domain || "")} onChange={(event) => updateProvider(index, { default_domain: event.target.value })} placeholder={type === "duckmail" ? "duckmail.sbs" : ""} className="h-10 rounded-xl border-stone-200 bg-white" disabled={config.enabled} />
+                        </div>
+                      ) : null}
+                      {type === "moemail" ? (
+                        <div className="space-y-2">
+                          <label className="text-sm text-stone-700">过期时间</label>
+                          <Select value={String(provider.expiry_time ?? 0)} onValueChange={(value) => updateProvider(index, { expiry_time: Number(value) })} disabled={config.enabled}>
+                            <SelectTrigger className="h-10 rounded-xl border-stone-200 bg-white">
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="3600000">1小时</SelectItem>
+                              <SelectItem value="86400000">24小时</SelectItem>
+                              <SelectItem value="259200000">3天</SelectItem>
+                              <SelectItem value="0">永久</SelectItem>
+                            </SelectContent>
+                          </Select>
                         </div>
                       ) : null}
                       {type === "yyds_mail" ? (

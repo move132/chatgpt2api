@@ -1,10 +1,12 @@
 {
-  "auth-key": "chatgpt2api",
+  "auth-key": "",
+  "bot_token": "",
+  "chat_id": "",
   "refresh_account_interval_minute": 5,
   "image_retention_days": 15,
   "image_poll_timeout_secs": 120,
   "auto_remove_rate_limited_accounts": false,
-  "auto_remove_invalid_accounts": true,
+  "auto_remove_invalid_accounts": false,
   "log_levels": [
     "debug",
     "error",
