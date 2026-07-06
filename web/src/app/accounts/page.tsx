@@ -93,14 +93,6 @@ const metricCards = [
   { key: "quota", label: "剩余额度", color: "text-blue-500", icon: RefreshCw },
 ] as const;
 
-function isUnlimitedImageQuotaAccount(account: Account) {
-  return account.type === "pro" || account.type === "prolite";
-}
-
-function imageQuotaUnknown(account: Account) {
-  return Boolean(account.image_quota_unknown);
-}
-
 function formatCompact(value: number) {
   if (value >= 1000) {
     return `${(value / 1000).toFixed(1)}k`;
@@ -109,12 +101,6 @@ function formatCompact(value: number) {
 }
 
 function formatQuota(account: Account) {
-  if (isUnlimitedImageQuotaAccount(account)) {
-    return "∞";
-  }
-  if (imageQuotaUnknown(account)) {
-    return "未知";
-  }
   return String(Math.max(0, account.quota));
 }
 
@@ -144,12 +130,6 @@ function formatRestoreAt(value?: string | null) {
 
 function formatQuotaSummary(accounts: Account[]) {
   const availableAccounts = accounts.filter((account) => account.status === "正常");
-  if (availableAccounts.some(isUnlimitedImageQuotaAccount)) {
-    return "∞";
-  }
-  if (availableAccounts.some(imageQuotaUnknown)) {
-    return "未知";
-  }
   return formatCompact(availableAccounts.reduce((sum, account) => sum + Math.max(0, account.quota), 0));
 }
 
@@ -387,8 +367,6 @@ function AccountsPageContent() {
     const baseAbnormal = baseAccountsList.filter((a) => a.status === "异常").length;
     const baseDisabled = baseAccountsList.filter((a) => a.status === "禁用").length;
     const baseNormalAccounts = baseAccountsList.filter((a) => a.status === "正常");
-    const baseHasUnlimited = baseNormalAccounts.some(isUnlimitedImageQuotaAccount);
-    const baseHasUnknown = baseNormalAccounts.some(imageQuotaUnknown);
     const baseQuotaNum = baseNormalAccounts.reduce((s, a) => s + Math.max(0, a.quota), 0);
 
     // 显示进度条（只显示当前任务，不含分类统计）
@@ -439,21 +417,13 @@ function AccountsPageContent() {
               const runningLimited = baseLimited + ((p.status_counts?.["限流"]) ?? 0);
               const runningAbnormal = baseAbnormal + ((p.status_counts?.["异常"]) ?? 0);
               const runningDisabled = baseDisabled + ((p.status_counts?.["禁用"]) ?? 0);
-              let runningQuota: string | number;
-              if (baseHasUnlimited) {
-                runningQuota = "∞";
-              } else if (baseHasUnknown) {
-                runningQuota = "未知";
-              } else {
-                runningQuota = formatCompact(baseQuotaNum + (p.total_quota ?? 0));
-              }
               setRefreshSummary({
                 total: accounts.length,
                 active: runningActive,
                 limited: runningLimited,
                 abnormal: runningAbnormal,
                 disabled: runningDisabled,
-                quota: runningQuota,
+                quota: formatCompact(baseQuotaNum + (p.total_quota ?? 0)),
               });
             }
           } catch (err) {

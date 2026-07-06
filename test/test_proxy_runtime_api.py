@@ -69,7 +69,6 @@ class FakeAccountService:
             "total": 1,
             "cumulative_total": 1,
             "active": 1,
-            "unlimited_quota_count": 0,
             "total_quota": 1,
             "limited": 0,
             "abnormal": 0,

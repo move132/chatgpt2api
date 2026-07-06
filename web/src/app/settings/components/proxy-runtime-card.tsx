@@ -105,7 +105,7 @@ export function ProxyRuntimeCard() {
               FlareSolverr 清障
             </div>
             <p className="mt-1 text-xs leading-6 text-stone-500">
-              默认关闭。用于注册遇到 Cloudflare 拦截后获取 clearance，可配合 WARP / Privoxy 代理链路重试。
+              默认关闭。用于上游请求遇到 Cloudflare 拦截后获取 clearance，可配合 WARP / Privoxy 代理链路重试。
             </p>
           </div>
           <span className={`rounded-full px-3 py-1 text-xs ${runtimeEnabled ? "bg-emerald-50 text-emerald-700" : "bg-stone-100 text-stone-500"}`}>

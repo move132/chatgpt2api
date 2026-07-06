@@ -22,7 +22,6 @@ export type Account = {
   source_type?: string | null;
   status: AccountStatus;
   quota: number;
-  image_quota_unknown?: boolean;
   email?: string | null;
   user_id?: string | null;
   limits_progress?: Array<{
@@ -171,6 +170,7 @@ export type SettingsConfig = {
   image_parallel_generation?: boolean;
   image_settle_enabled?: boolean;
   image_check_before_hit_enabled?: boolean;
+  image_remove_conversation_after_result?: boolean;
   image_settle_secs?: number | string;
   image_timeout_retry_secs?: number | string;
   auto_remove_invalid_accounts?: boolean;
@@ -187,7 +187,6 @@ export type SettingsConfig = {
 
 export type BackupInclude = {
   config: boolean;
-  register: boolean;
   cpa: boolean;
   sub2api: boolean;
   logs: boolean;
@@ -315,53 +314,6 @@ export type UserKey = {
   enabled: boolean;
   created_at: string | null;
   last_used_at: string | null;
-};
-
-export type OutlookPoolStats = {
-  unused: number;
-  in_use: number;
-  used: number;
-  token_invalid: number;
-  failed: number;
-};
-
-export type RegisterConfig = {
-  enabled: boolean;
-  mail: {
-    request_timeout: number;
-    wait_timeout: number;
-    wait_interval: number;
-    api_use_register_proxy: boolean;
-    providers: Array<Record<string, unknown>>;
-  };
-  proxy: string;
-  total: number;
-  threads: number;
-  mode: "total" | "quota" | "available";
-  target_quota: number;
-  target_available: number;
-  check_interval: number;
-  stats: {
-    job_id?: string;
-    success: number;
-    fail: number;
-    done: number;
-    running: number;
-    threads: number;
-    elapsed_seconds?: number;
-    avg_seconds?: number;
-    success_rate?: number;
-    current_quota?: number;
-    current_available?: number;
-    started_at?: string;
-    updated_at?: string;
-    finished_at?: string;
-  };
-  logs?: Array<{
-    time: string;
-    text: string;
-    level: string;
-  }>;
 };
 
 export async function login(authKey: string) {
@@ -739,36 +691,6 @@ export async function updateUserKey(keyId: string, updates: { enabled?: boolean;
 export async function deleteUserKey(keyId: string) {
   return httpRequest<{ items: UserKey[] }>(`/api/auth/users/${keyId}`, {
     method: "DELETE",
-  });
-}
-
-export async function fetchRegisterConfig() {
-  return httpRequest<{ register: RegisterConfig }>("/api/register");
-}
-
-export async function updateRegisterConfig(updates: Partial<RegisterConfig>) {
-  return httpRequest<{ register: RegisterConfig }>("/api/register", {
-    method: "POST",
-    body: updates,
-  });
-}
-
-export async function startRegister() {
-  return httpRequest<{ register: RegisterConfig }>("/api/register/start", { method: "POST" });
-}
-
-export async function stopRegister() {
-  return httpRequest<{ register: RegisterConfig }>("/api/register/stop", { method: "POST" });
-}
-
-export async function resetRegister() {
-  return httpRequest<{ register: RegisterConfig }>("/api/register/reset", { method: "POST" });
-}
-
-export async function resetOutlookPool(scope: "all" | "failed" | "unused" = "all") {
-  return httpRequest<{ register: RegisterConfig }>("/api/register/outlook-pool/reset", {
-    method: "POST",
-    body: { scope },
   });
 }
 

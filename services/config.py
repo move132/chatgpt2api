@@ -18,7 +18,6 @@ BACKUP_STATE_FILE = DATA_DIR / "backup_state.json"
 
 DEFAULT_BACKUP_INCLUDE = {
     "config": True,
-    "register": True,
     "cpa": True,
     "sub2api": True,
     "logs": True,
@@ -465,6 +464,14 @@ class ConfigStore:
         return bool(value)
 
     @property
+    def image_remove_conversation_after_result(self) -> bool:
+        """出图成功后异步隐藏 ChatGPT 本地对话记录。"""
+        value = self.data.get("image_remove_conversation_after_result", False)
+        if isinstance(value, str):
+            return value.strip().lower() in {"1", "true", "yes", "on"}
+        return bool(value)
+
+    @property
     def image_settle_secs(self) -> float:
         """二次确认等待时间（秒）。"""
         try:
@@ -568,6 +575,7 @@ class ConfigStore:
         data["image_poll_initial_wait_secs"] = self.image_poll_initial_wait_secs
         data["image_account_concurrency"] = self.image_account_concurrency
         data["image_parallel_generation"] = self.image_parallel_generation
+        data["image_remove_conversation_after_result"] = self.image_remove_conversation_after_result
         data["auto_remove_invalid_accounts"] = self.auto_remove_invalid_accounts
         data["auto_remove_rate_limited_accounts"] = self.auto_remove_rate_limited_accounts
         data["auto_relogin_after_refresh"] = self.auto_relogin_after_refresh

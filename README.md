@@ -33,7 +33,7 @@ docker compose up -d
 
 ### WARP / FlareSolverr 稳定代理部署
 
-如果注册或图片链路经常遇到 Cloudflare 拦截，可以启用附带的 WARP + Privoxy + FlareSolverr 方案：
+如果图片链路经常遇到 Cloudflare 拦截，可以启用附带的 WARP + Privoxy + FlareSolverr 方案：
 
 ```bash
 cp .env.example .env

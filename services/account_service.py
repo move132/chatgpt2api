@@ -134,8 +134,6 @@ class AccountService:
             return False
         if account.get("status") in {"禁用", "限流", "异常"}:
             return False
-        if bool(account.get("image_quota_unknown")):
-            return True
         return int(account.get("quota") or 0) > 0
 
     @classmethod
@@ -220,7 +218,6 @@ class AccountService:
         normalized["type"] = normalized.get("type") or "free"
         normalized["status"] = normalized.get("status") or "正常"
         normalized["quota"] = max(0, int(normalized.get("quota") if normalized.get("quota") is not None else 0))
-        normalized["image_quota_unknown"] = bool(normalized.get("image_quota_unknown"))
         normalized["email"] = normalized.get("email") or None
         normalized["user_id"] = normalized.get("user_id") or None
         normalized["proxy"] = str(normalized.get("proxy") or "").strip()
@@ -608,7 +605,7 @@ class AccountService:
             device_id = str(uuid.uuid4())
             
             # ─── 方式2: OAuth authorize 流程 ──────────────────────────
-            # 使用 Platform Client + PKCE（与注册流程相同）
+            # 使用 Platform Client + PKCE
             
             from utils.pkce import generate_pkce
             code_verifier, code_challenge = generate_pkce()
@@ -748,7 +745,7 @@ class AccountService:
                 else:
                     return {"ok": False, "error": "no_auth_code", "detail": login_data}
             
-            # ④ 用 code 换 token (使用 Platform Client + code_verifier，与注册流程相同)
+            # ④ 用 code 换 token (使用 Platform Client + code_verifier)
             platform_base = "https://platform.openai.com"
             token_resp = session.post(
                 f"{auth_base}/api/accounts/oauth/token",
@@ -1292,12 +1289,10 @@ class AccountService:
                 return None
             next_item = dict(current)
             next_item["last_used_at"] = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-            image_quota_unknown = bool(next_item.get("image_quota_unknown"))
             if success:
                 next_item["success"] = int(next_item.get("success") or 0) + 1
-                if not image_quota_unknown:
-                    next_item["quota"] = max(0, int(next_item.get("quota") or 0) - 1)
-                if not image_quota_unknown and next_item["quota"] == 0:
+                next_item["quota"] = max(0, int(next_item.get("quota") or 0) - 1)
+                if next_item["quota"] == 0:
                     next_item["status"] = "限流"
                     next_item["restore_at"] = next_item.get("restore_at") or None
                 elif next_item.get("status") == "限流":
@@ -1672,7 +1667,6 @@ class AccountService:
         abnormal = sum(1 for a in items if a.get("status") == "异常")
         disabled = sum(1 for a in items if a.get("status") == "禁用")
         total_quota = sum(max(0, int(a.get("quota") or 0)) for a in items if a.get("status") == "正常")
-        unlimited = sum(1 for a in items if a.get("status") == "正常" and bool(a.get("image_quota_unknown")))
         total_success = sum(int(a.get("success") or 0) for a in items)
         total_fail = sum(int(a.get("fail") or 0) for a in items)
         by_type = {}
@@ -1687,7 +1681,6 @@ class AccountService:
             "abnormal": abnormal,
             "disabled": disabled,
             "total_quota": total_quota,
-            "unlimited_quota_count": unlimited,
             "total_success": total_success,
             "total_fail": total_fail,
             "by_type": by_type,
@@ -1696,7 +1689,7 @@ class AccountService:
     def account_health(self) -> dict:
         stats = self.get_stats()
         return {
-            "healthy": stats["active"] > 0 or stats["unlimited_quota_count"] > 0,
+            "healthy": stats["active"] > 0,
             "status": "ok" if stats["active"] > 0 else "degraded",
             **stats,
         }

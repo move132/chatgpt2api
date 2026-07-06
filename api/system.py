@@ -299,7 +299,7 @@ def create_router(app_version: str) -> APIRouter:
         stats = acct_svc.get_stats()
         storage = config.get_storage_backend()
         storage_health = storage.health_check()
-        healthy = stats["active"] > 0 or stats["unlimited_quota_count"] > 0
+        healthy = stats["active"] > 0
 
         stats_json = {
             "status": "ok" if healthy else "degraded",
@@ -348,7 +348,6 @@ td{{padding:8px 12px;border-top:1px solid #2a2d3a;font-size:14px}}tr:hover td{{b
 <div class="card"><div class="label">当前账号</div><div class="value blue">{stats['total']}</div></div>
 <div class="card"><div class="label">累计入库</div><div class="value">{stats['cumulative_total']}</div></div>
 <div class="card"><div class="label">可用账号</div><div class="value green">{stats['active']}</div></div>
-<div class="card"><div class="label">无限额</div><div class="value">{stats['unlimited_quota_count']}</div></div>
 <div class="card"><div class="label">剩余额度</div><div class="value">{stats['total_quota']}</div></div>
 <div class="card"><div class="label">限流</div><div class="value yellow">{stats['limited']}</div></div>
 <div class="card"><div class="label">异常</div><div class="value red">{stats['abnormal']}</div></div>

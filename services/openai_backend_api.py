@@ -261,11 +261,11 @@ class OpenAIBackendAPI:
         return headers
 
     @staticmethod
-    def _extract_quota_and_restore_at(limits_progress: list[Any]) -> tuple[int, str | None, bool]:
+    def _extract_quota_and_restore_at(limits_progress: list[Any]) -> tuple[int, str | None]:
         for item in limits_progress:
             if isinstance(item, dict) and item.get("feature_name") == "image_gen":
-                return int(item.get("remaining") or 0), str(item.get("reset_after") or "") or None, False
-        return 0, None, True
+                return int(item.get("remaining") or 0), str(item.get("reset_after") or "") or None
+        return 0, None
 
     def _raise_on_error(self, response: Any, path: str) -> None:
         if response.status_code == 401:
@@ -338,17 +338,16 @@ class OpenAIBackendAPI:
 
         limits_progress = init_payload.get("limits_progress")
         limits_progress = limits_progress if isinstance(limits_progress, list) else []
-        quota, restore_at, image_quota_unknown = self._extract_quota_and_restore_at(limits_progress)
+        quota, restore_at = self._extract_quota_and_restore_at(limits_progress)
         result = {
             "email": me_payload.get("email"),
             "user_id": me_payload.get("id"),
             "type": plan_type,
             "quota": quota,
-            "image_quota_unknown": image_quota_unknown,
             "limits_progress": limits_progress,
             "default_model_slug": init_payload.get("default_model_slug"),
             "restore_at": restore_at,
-            "status": "正常" if image_quota_unknown and plan_type.lower() != "free" else ("限流" if quota == 0 else "正常"),
+            "status": "限流" if quota == 0 else "正常",
         }
         logger.debug({
             "event": "backend_user_info_result",
@@ -356,7 +355,6 @@ class OpenAIBackendAPI:
             "user_id": result.get("user_id"),
             "type": result.get("type"),
             "quota": result.get("quota"),
-            "image_quota_unknown": result.get("image_quota_unknown"),
             "default_model_slug": result.get("default_model_slug"),
             "restore_at": result.get("restore_at"),
             "status": result.get("status"),
@@ -1027,6 +1025,24 @@ class OpenAIBackendAPI:
         path = f"/backend-api/conversation/{conversation_id}"
         response = self.session.get(self.base_url + path, headers=self._headers(path, {"Accept": "application/json"}),
                                     timeout=60)
+        ensure_ok(response, path)
+        return response.json()
+
+    def delete_conversation(self, conversation_id: str) -> Dict[str, Any]:
+        """删除本地对话记录。"""
+        path = f"/backend-api/conversation/{conversation_id}"
+        headers = self._headers(path, {
+            "Accept": "*/*",
+            "Content-Type": "application/json",
+            "Referer": f"{self.base_url}/c/{conversation_id}",
+            "X-OpenAI-Target-Route": "/backend-api/conversation/{conversation_id}",
+        })
+        response = self.session.patch(
+            self.base_url + path,
+            headers=headers,
+            json={"is_visible": False},
+            timeout=60,
+        )
         ensure_ok(response, path)
         return response.json()
 
