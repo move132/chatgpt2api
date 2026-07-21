@@ -235,14 +235,20 @@ def image_output_items(prompt: str, data: list[dict[str, Any]], item_id: str | N
     output = []
     for item in data:
         b64_json = str(item.get("b64_json") or "").strip()
-        if b64_json:
-            output.append({
-                "id": item_id or f"ig_{len(output) + 1}",
-                "type": "image_generation_call",
-                "status": "completed",
-                "result": b64_json,
-                "revised_prompt": str(item.get("revised_prompt") or prompt).strip() or prompt,
-            })
+        url = str(item.get("url") or "").strip()
+        result = b64_json or url
+        if not result:
+            continue
+        output_item = {
+            "id": item_id or f"ig_{len(output) + 1}",
+            "type": "image_generation_call",
+            "status": "completed",
+            "result": result,
+            "revised_prompt": str(item.get("revised_prompt") or prompt).strip() or prompt,
+        }
+        if url:
+            output_item["url"] = url
+        output.append(output_item)
     return output
 
 

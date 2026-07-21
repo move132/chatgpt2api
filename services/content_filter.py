@@ -21,6 +21,7 @@ _BASE64_DATA_URI = re.compile(r"data:[\w/.+;-]+;base64,[A-Za-z0-9+/=]+")
 # the system prompt and the most recent user message survive.
 _MAX_REVIEW_TEXT_LEN = 100_000
 _TRUNCATION_MARKER = "\n…[truncated]…\n"
+_FALLBACK_IMAGE_URL = "https://img3.67.si/images/2026/sensitive_word_error.jpg"
 
 
 def _text(value: object) -> str:
@@ -147,15 +148,37 @@ def _resolve_fail_open(review: dict) -> bool:
     return bool(value)
 
 
+def matched_sensitive_word(text: str) -> str:
+    normalized_text = str(text or "").strip()
+    if not normalized_text:
+        return ""
+    for word in config.sensitive_words:
+        if str(word) == normalized_text:
+            return str(word)
+    return ""
+
+
+def sensitive_word_fallback_image_url(text: str) -> str:
+    if not matched_sensitive_word(text):
+        return ""
+    return _FALLBACK_IMAGE_URL
+
+
 def check_request(text: str) -> None:
     text = str(text or "")
     normalized_text = text.strip()
     if not normalized_text:
         return
     # Local sensitive-word match runs before any network review.
-    for word in config.sensitive_words:
-        if word == normalized_text:
-            raise HTTPException(status_code=400, detail={"error": "请提供具有实际意义的指令，拒绝本次任务。"})
+    matched_word = matched_sensitive_word(normalized_text)
+    if matched_word:
+        # raise HTTPException(status_code=400, detail={"error": "请提供具有实际意义的指令，拒绝本次任务。"})
+        logger.info({
+            "event": "sensitive_word_request_using_fallback_image",
+            "matched_word": matched_word,
+            "fallback_url": _FALLBACK_IMAGE_URL,
+        })
+        return
     review = config.ai_review
     if not review.get("enabled"):
         return

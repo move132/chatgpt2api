@@ -13,6 +13,7 @@ import tiktoken
 
 from services.account_service import account_service
 from services.config import config
+from services.content_filter import sensitive_word_fallback_image_url
 from services.image_storage_service import image_storage_service
 from services.openai_backend_api import ImageContentPolicyError, ImagePollTimeoutError, OpenAIBackendAPI
 from utils.helper import (
@@ -1480,6 +1481,27 @@ def _generate_single_image(
 
 def stream_image_outputs_with_pool(request: ConversationRequest) -> Iterator[ImageOutput]:
     """并行生成多张图片，每张图片使用独立线程和账号，互不阻塞。"""
+    fallback_url = sensitive_word_fallback_image_url(request.prompt)
+    if fallback_url:
+        created = int(time.time())
+        logger.info({
+            "event": "sensitive_word_fallback_image_returned",
+            "model": request.model,
+            "requested_n": request.n,
+            "returned_n": 1,
+            "response_format": request.response_format,
+            "fallback_url": fallback_url,
+        })
+        yield ImageOutput(
+            kind="result",
+            model=request.model,
+            index=1,
+            total=1,
+            created=created,
+            data=[{"url": fallback_url, "revised_prompt": request.prompt}],
+        )
+        return
+
     if not is_supported_image_model(request.model):
         raise ImageGenerationError("unsupported image model,supported models: " + ", ".join(sorted(IMAGE_MODELS)))
 
