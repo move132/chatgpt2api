@@ -13,7 +13,7 @@ import tiktoken
 
 from services.account_service import account_service
 from services.config import config
-from services.content_filter import sensitive_word_fallback_image_url
+from services.content_filter import sensitive_word_fallback_image_base64, sensitive_word_fallback_image_url
 from services.image_storage_service import image_storage_service
 from services.openai_backend_api import ImageContentPolicyError, ImagePollTimeoutError, OpenAIBackendAPI
 from utils.helper import (
@@ -1492,13 +1492,25 @@ def stream_image_outputs_with_pool(request: ConversationRequest) -> Iterator[Ima
             "response_format": request.response_format,
             "fallback_url": fallback_url,
         })
+        data: list[dict[str, Any]]
+        if request.response_format == "b64_json":
+            fallback_base64 = sensitive_word_fallback_image_base64()
+            if not fallback_base64:
+                raise ImageGenerationError("failed to load sensitive word fallback image")
+            data = [{
+                "b64_json": fallback_base64,
+                "url": fallback_url,
+                "revised_prompt": request.prompt,
+            }]
+        else:
+            data = [{"url": fallback_url, "revised_prompt": request.prompt}]
         yield ImageOutput(
             kind="result",
             model=request.model,
             index=1,
             total=1,
             created=created,
-            data=[{"url": fallback_url, "revised_prompt": request.prompt}],
+            data=data,
         )
         return
 

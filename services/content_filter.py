@@ -1,6 +1,8 @@
 from __future__ import annotations
 
+import base64
 import re
+from functools import lru_cache
 
 from curl_cffi import requests
 from fastapi import HTTPException
@@ -162,6 +164,35 @@ def sensitive_word_fallback_image_url(text: str) -> str:
     if not matched_sensitive_word(text):
         return ""
     return _FALLBACK_IMAGE_URL
+
+
+@lru_cache(maxsize=1)
+def sensitive_word_fallback_image_base64() -> str:
+    try:
+        response = requests.get(
+            _FALLBACK_IMAGE_URL,
+            timeout=30,
+            allow_redirects=True,
+            **proxy_settings.build_session_kwargs(),
+        )
+    except Exception as exc:
+        logger.error({
+            "event": "sensitive_word_fallback_image_download_failed",
+            "fallback_url": _FALLBACK_IMAGE_URL,
+            "error": str(exc),
+        })
+        return ""
+    content_type = str(response.headers.get("content-type") or "").split(";", 1)[0].strip().lower()
+    if not 200 <= response.status_code < 300 or not content_type.startswith("image/") or not response.content:
+        logger.error({
+            "event": "sensitive_word_fallback_image_invalid_response",
+            "fallback_url": _FALLBACK_IMAGE_URL,
+            "status_code": response.status_code,
+            "content_type": content_type,
+            "content_length": len(response.content or b""),
+        })
+        return ""
+    return base64.b64encode(response.content).decode("ascii")
 
 
 def check_request(text: str) -> None:
